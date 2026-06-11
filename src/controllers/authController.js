@@ -83,7 +83,17 @@ const authUser = asyncHandler(async (req, res) => {
   // Check for user email
   const user = await User.findOne({ email }).select('+password');
 
-  if (user && (await user.matchPassword(password))) {
+  if (!user) {
+    res.status(401);
+    throw new Error('Invalid email or password');
+  }
+
+  if (!user.password) {
+    res.status(400);
+    throw new Error('This email is registered with Google. Please sign in with Google instead.');
+  }
+
+  if (await user.matchPassword(password)) {
     // Only enforce verification for students who went through the new registration flow (have a token)
     // Admins and legacy users are exempt.
     if (user.role === 'student' && user.isEmailVerified === false && user.emailVerificationToken) {
