@@ -216,5 +216,47 @@ const sendRemarkNotification = async (studentEmail, content, applicationId) => {
   }
 };
 
-module.exports = { sendSubmissionEmail, sendRemarkNotification };
+const sendVerificationEmail = async (email, token) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    const verificationLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email/${token}`;
+
+    const mailOptions = {
+      from: `"Spectrum PhD Admissions" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Verify Your Email - Spectrum Consultants',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="color: #ED1C24;">Welcome to Spectrum Consultants!</h2>
+          <p>Thank you for registering. To complete your registration and log into your dashboard, please verify your email address by clicking the button below:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationLink}" style="display: inline-block; padding: 12px 24px; background-color: #ED1C24; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px;">Verify Email</a>
+          </div>
+          
+          <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #666; font-size: 14px;"><a href="${verificationLink}">${verificationLink}</a></p>
+          
+          <br/><br/>
+          <p>Best Regards,<br/>PhD Admissions Team<br/>Spectrum Consultants</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Verification email sent to:', email);
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+    throw error;
+  }
+};
+
+module.exports = { sendSubmissionEmail, sendRemarkNotification, sendVerificationEmail };
 

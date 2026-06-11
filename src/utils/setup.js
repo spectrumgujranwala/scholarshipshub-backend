@@ -11,7 +11,8 @@ const createInitialAdmin = async () => {
         email: email,
         password: password,
         role: 'admin',
-        designation: 'Senior Admin'
+        designation: 'Senior Admin',
+        isEmailVerified: true
       });
       console.log(`Initial admin user created with email: ${email}`);
     }

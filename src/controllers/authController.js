@@ -1,7 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
 const User = require('../models/User');
+const { sendVerificationEmail } = require('../utils/emailService');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -43,20 +45,29 @@ const registerUser = asyncHandler(async (req, res) => {
   // Default role is 'student'. Role can be updated by admin later.
   // For the first user ever, we could conditionally allow 'admin', 
   // but for now let's keep it strictly 'student' to avoid vulnerability.
+  // Generate email verification token
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+
   const user = await User.create({
     email,
     password,
     role: 'student',
+    isEmailVerified: false,
+    emailVerificationToken: verificationToken,
   });
 
   if (user) {
-    res.status(201).json({
-      _id: user._id,
-      email: user.email,
-      role: user.role,
-      designation: user.designation,
-      token: generateToken(user._id),
-    });
+    try {
+      await sendVerificationEmail(user.email, verificationToken);
+      res.status(201).json({
+        message: 'Registration successful! Please check your email to verify your account.',
+      });
+    } catch (error) {
+      console.error('Email verification sending error:', error);
+      // In a real production scenario, you might still return 201 but notify of the email issue
+      res.status(500);
+      throw new Error('Error sending verification email');
+    }
   } else {
     res.status(400);
     throw new Error('Invalid user data');
@@ -73,6 +84,12 @@ const authUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
 
   if (user && (await user.matchPassword(password))) {
+    // Only enforce verification for students who went through the new registration flow (have a token)
+    // Admins and legacy users are exempt.
+    if (user.role === 'student' && user.isEmailVerified === false && user.emailVerificationToken) {
+      res.status(401);
+      throw new Error('Please verify your email address to log in.');
+    }
     res.json({
       _id: user._id,
       email: user.email,
@@ -104,6 +121,7 @@ const createAdminUser = asyncHandler(async (req, res) => {
     password,
     role: 'admin',
     designation: designation || 'Admin',
+    isEmailVerified: true,
   });
 
   if (user) {
@@ -199,10 +217,38 @@ const googleAuth = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Verify user email
+// @route   GET /api/auth/verify-email/:token
+// @access  Public
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+
+  const user = await User.findOne({ emailVerificationToken: token });
+
+  if (!user) {
+    res.status(400);
+    throw new Error('Invalid or expired verification token');
+  }
+
+  user.isEmailVerified = true;
+  user.emailVerificationToken = undefined;
+  await user.save();
+
+  res.json({
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+    designation: user.designation,
+    token: generateToken(user._id),
+    message: 'Email successfully verified',
+  });
+});
+
 module.exports = {
   registerUser,
   authUser,
   getMe,
   createAdminUser,
   googleAuth,
+  verifyEmail,
 };
