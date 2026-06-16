@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.service_role;
+const supabaseServiceKey = process.env.SERVICE_ROLE;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Supabase URL and Service Role Key are required');
