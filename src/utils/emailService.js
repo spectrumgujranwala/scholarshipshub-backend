@@ -1,8 +1,10 @@
 const nodemailer = require('nodemailer');
 const axios = require('axios');
+const { signApplicationUrls } = require('./supabaseSigner');
 
-const sendSubmissionEmail = async (application) => {
+const sendSubmissionEmail = async (rawApplication) => {
   try {
+    const application = await signApplicationUrls(rawApplication);
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {

@@ -1,4 +1,5 @@
 const { uploadToSupabase } = require('../utils/upload');
+const { signSupabaseUrl } = require('../utils/supabaseSigner');
 const multer = require('multer');
 
 // Configure multer to use memory storage
@@ -30,9 +31,10 @@ const uploadFile = async (req, res) => {
 
     const folder = req.body.folder || 'applications';
     const fileUrl = await uploadToSupabase(req.file, folder);
+    const signedUrl = await signSupabaseUrl(fileUrl);
 
     res.json({
-      url: fileUrl,
+      url: signedUrl,
       fileName: req.file.originalname,
       mimetype: req.file.mimetype,
     });

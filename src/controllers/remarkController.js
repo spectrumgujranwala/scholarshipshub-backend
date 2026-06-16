@@ -4,12 +4,14 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Application = require('../models/Application');
 const { sendRemarkNotification } = require('../utils/emailService');
+const { signRemarkUrls, unsignDocUrls } = require('../utils/supabaseSigner');
 
 // @desc    Add a new remark to an application
 // @route   POST /api/remarks
 // @access  Private
 const addRemark = asyncHandler(async (req, res) => {
-  const { applicationId, universityApplicationId, content, attachmentUrl, attachmentName } = req.body;
+  const cleanedBody = unsignDocUrls(req.body);
+  const { applicationId, universityApplicationId, content, attachmentUrl, attachmentName } = cleanedBody;
 
   let targetUserId;
   let targetTitle = 'New Remark from Admin';
@@ -81,7 +83,8 @@ const addRemark = asyncHandler(async (req, res) => {
     }
   }
 
-  res.status(201).json(remark);
+  const signedRemark = await signRemarkUrls(remark);
+  res.status(201).json(signedRemark);
 });
 
 // @desc    Get all remarks for an application (master or university)
@@ -108,7 +111,8 @@ const getRemarks = asyncHandler(async (req, res) => {
     .populate('sender', 'email designation role')
     .sort({ createdAt: 1 });
 
-  res.json(remarks);
+  const signedRemarks = await Promise.all(remarks.map(rem => signRemarkUrls(rem)));
+  res.json(signedRemarks);
 });
 
 module.exports = {

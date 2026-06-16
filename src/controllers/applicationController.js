@@ -1,6 +1,7 @@
 const Application = require('../models/Application');
 const User = require('../models/User');
 const { sendSubmissionEmail } = require('../utils/emailService');
+const { signApplicationUrls, unsignDocUrls } = require('../utils/supabaseSigner');
 
 // @desc    Get or create current student application
 // @route   GET /api/applications/me
@@ -15,7 +16,8 @@ const getMyApplication = async (req, res) => {
     });
   }
 
-  res.json(application);
+  const signedApp = await signApplicationUrls(application);
+  res.json(signedApp);
 };
 
 // @desc    Update application section
@@ -23,7 +25,7 @@ const getMyApplication = async (req, res) => {
 // @access  Private (Student)
 const updateSection = async (req, res) => {
   const { section } = req.params;
-  const data = req.body;
+  const data = unsignDocUrls(req.body);
 
   const application = await Application.findOne({ user: req.user._id });
 
@@ -151,7 +153,8 @@ const updateSection = async (req, res) => {
   application.profileStrength = calculateProfileStrength(application);
 
   const updatedApplication = await application.save();
-  res.json(updatedApplication);
+  const signedApp = await signApplicationUrls(updatedApplication);
+  res.json(signedApp);
 };
 
 // @desc    Submit application
@@ -181,7 +184,8 @@ const submitApplication = async (req, res) => {
     sendSubmissionEmail(updatedApplication);
   }
 
-  res.json(updatedApplication);
+  const signedApp = await signApplicationUrls(updatedApplication);
+  res.json(signedApp);
 };
 
 // Admin Controllers
@@ -199,7 +203,8 @@ const getAllApplications = async (req, res) => {
   // Filter out any applications where user is null (because they didn't match the student role)
   const filteredApps = applications.filter(app => app.user != null);
   
-  res.json(filteredApps);
+  const signedApps = await Promise.all(filteredApps.map(app => signApplicationUrls(app)));
+  res.json(signedApps);
 };
 
 // @desc    Update application status
@@ -212,7 +217,8 @@ const updateStatus = async (req, res) => {
   if (application) {
     application.status = status;
     const updatedApplication = await application.save();
-    res.json(updatedApplication);
+    const signedApp = await signApplicationUrls(updatedApplication);
+    res.json(signedApp);
   } else {
     res.status(404).json({ message: 'Application not found' });
   }
@@ -225,7 +231,8 @@ const getApplicationById = async (req, res) => {
   const application = await Application.findById(req.params.id).populate('user', 'email');
 
   if (application) {
-    res.json(application);
+    const signedApp = await signApplicationUrls(application);
+    res.json(signedApp);
   } else {
     res.status(404).json({ message: 'Application not found' });
   }

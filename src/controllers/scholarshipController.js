@@ -1,12 +1,18 @@
 const asyncHandler = require('express-async-handler');
 const Scholarship = require('../models/Scholarship');
+const { signSupabaseUrl, unsignDocUrls } = require('../utils/supabaseSigner');
 
 // @desc    Create a new scholarship
 // @route   POST /api/scholarships
 // @access  Private/Admin
 const createScholarship = asyncHandler(async (req, res) => {
-  const scholarship = await Scholarship.create(req.body);
-  res.status(201).json(scholarship);
+  const cleanedBody = unsignDocUrls(req.body);
+  const scholarship = await Scholarship.create(cleanedBody);
+  const obj = scholarship.toObject();
+  if (obj.thumbnail) {
+    obj.thumbnail = await signSupabaseUrl(obj.thumbnail);
+  }
+  res.status(201).json(obj);
 });
 
 // @desc    Get all scholarships with filters
@@ -14,9 +20,9 @@ const createScholarship = asyncHandler(async (req, res) => {
 // @access  Private
 const getScholarships = asyncHandler(async (req, res) => {
   const { title, country, university, degreeLevels, fundedBy, studyArea } = req.query;
-  
+
   let query = {};
-  
+
   if (title) {
     query.title = { $regex: title, $options: 'i' };
   }
@@ -38,7 +44,14 @@ const getScholarships = asyncHandler(async (req, res) => {
   }
 
   const scholarships = await Scholarship.find(query).sort({ createdAt: -1 });
-  res.json(scholarships);
+  const signedScholarships = await Promise.all(scholarships.map(async (s) => {
+    const obj = s.toObject();
+    if (obj.thumbnail) {
+      obj.thumbnail = await signSupabaseUrl(obj.thumbnail);
+    }
+    return obj;
+  }));
+  res.json(signedScholarships);
 });
 
 // @desc    Update a scholarship
@@ -52,13 +65,18 @@ const updateScholarship = asyncHandler(async (req, res) => {
     throw new Error('Scholarship not found');
   }
 
+  const cleanedBody = unsignDocUrls(req.body);
   const updatedScholarship = await Scholarship.findByIdAndUpdate(
     req.params.id,
-    req.body,
+    cleanedBody,
     { new: true }
   );
 
-  res.json(updatedScholarship);
+  const obj = updatedScholarship.toObject();
+  if (obj.thumbnail) {
+    obj.thumbnail = await signSupabaseUrl(obj.thumbnail);
+  }
+  res.json(obj);
 });
 
 // @desc    Delete a scholarship
